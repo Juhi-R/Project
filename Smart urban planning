@@ -1,0 +1,443 @@
+1. Project structure
+smart_urban_planning/
+│
+├── manage.py
+├── db.sqlite3
+│
+├── urban/
+│   ├── models.py
+│   ├── views.py
+│   ├── urls.py
+│   ├── serializers.py
+│   └── admin.py
+│
+├── smart_city/
+│   ├── settings.py
+│   └── urls.py
+│
+└── templates/
+    └── dashboard.html
+2. Install Django and REST Framework
+pip install django djangorestframework
+Create the project:
+django-admin startproject smart_city
+cd smart_city
+python manage.py startapp urban
+Add these apps in smart_city/settings.py:
+INSTALLED_APPS = [
+    'django.contrib.admin',
+    'django.contrib.auth',
+    'django.contrib.contenttypes',
+    'django.contrib.sessions',
+    'django.contrib.messages',
+    'django.contrib.staticfiles',
+
+    'rest_framework',
+    'urban',
+]
+3. urban/models.py
+This creates database tables for traffic, pollution and complaints.
+from django.db import models
+
+
+class UrbanData(models.Model):
+    location = models.CharField(max_length=100)
+    traffic_level = models.IntegerField()
+    pollution_level = models.FloatField()
+    complaints = models.IntegerField()
+    date = models.DateField(auto_now_add=True)
+
+    def __str__(self):
+        return self.location
+
+
+class Complaint(models.Model):
+    name = models.CharField(max_length=100)
+    category = models.CharField(max_length=100)
+    description = models.TextField()
+    status = models.CharField(max_length=30, default="Pending")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return self.category
+4. urban/serializers.py
+from rest_framework import serializers
+from .models import UrbanData, Complaint
+
+
+class UrbanDataSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = UrbanData
+        fields = '__all__'
+
+
+class ComplaintSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = Complaint
+        fields = '__all__'
+5. urban/views.py
+This provides the REST APIs and dashboard.
+from django.shortcuts import render
+from rest_framework.decorators import api_view
+from rest_framework.response import Response
+
+from .models import UrbanData, Complaint
+from .serializers import UrbanDataSerializer, ComplaintSerializer
+
+
+def dashboard(request):
+    data = UrbanData.objects.all()
+
+    context = {
+        "data": data,
+        "total_complaints": Complaint.objects.count(),
+    }
+
+    return render(request, "dashboard.html", context)
+
+
+@api_view(['GET'])
+def urban_data(request):
+
+    data = UrbanData.objects.all()
+    serializer = UrbanDataSerializer(data, many=True)
+
+    return Response(serializer.data)
+
+
+@api_view(['POST'])
+def add_complaint(request):
+
+    serializer = ComplaintSerializer(data=request.data)
+
+    if serializer.is_valid():
+        serializer.save()
+        return Response({
+            "message": "Complaint submitted successfully",
+            "data": serializer.data
+        })
+
+    return Response(serializer.errors, status=400)
+
+
+@api_view(['GET'])
+def complaints(request):
+
+    data = Complaint.objects.all()
+    serializer = ComplaintSerializer(data, many=True)
+
+    return Response(serializer.data)
+6. urban/urls.py
+from django.urls import path
+
+from .views import (
+    dashboard,
+    urban_data,
+    add_complaint,
+    complaints
+)
+
+urlpatterns = [
+
+    path('', dashboard, name='dashboard'),
+
+    path('api/urban-data/',
+         urban_data,
+         name='urban-data'),
+
+    path('api/complaints/',
+         complaints,
+         name='complaints'),
+
+    path('api/add-complaint/',
+         add_complaint,
+         name='add-complaint'),
+]
+7. Main smart_city/urls.py
+from django.contrib import admin
+from django.urls import path, include
+
+urlpatterns = [
+
+    path('admin/', admin.site.urls),
+
+    path('', include('urban.urls')),
+
+]
+8. Generate random urban dataset
+Create a file called:
+urban/generate_data.py
+import random
+from datetime import date, timedelta
+
+from .models import UrbanData
+
+
+def generate_data():
+
+    locations = [
+        "MP Nagar",
+        "New Market",
+        "Arera Colony",
+        "Kolar Road",
+        "BHEL",
+        "Habibganj",
+        "Lalghati",
+        "Misrod",
+        "Bairagarh",
+        "Ayodhya Bypass"
+    ]
+
+    UrbanData.objects.all().delete()
+
+    for i in range(50):
+
+        location = random.choice(locations)
+
+        traffic = random.randint(10, 100)
+
+        pollution = round(
+            random.uniform(20, 250), 2
+        )
+
+        complaints = random.randint(0, 30)
+
+        UrbanData.objects.create(
+            location=location,
+            traffic_level=traffic,
+            pollution_level=pollution,
+            complaints=complaints
+        )
+
+    print("50 random urban records created!")
+Then run it through Django shell:
+python manage.py shell
+from urban.generate_data import generate_data
+generate_data()
+exit()
+9. Dashboard HTML
+Create:
+templates/dashboard.html
+<!DOCTYPE html>
+
+<html>
+
+<head>
+
+    <title>Smart Urban Planning</title>
+
+    <style>
+
+        body {
+            font-family: Arial;
+            background: #f4f6f8;
+            margin: 0;
+        }
+
+        header {
+            background: #1f2937;
+            color: white;
+            padding: 20px;
+            text-align: center;
+        }
+
+        .container {
+            padding: 30px;
+        }
+
+        .cards {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .card {
+            background: white;
+            padding: 20px;
+            flex: 1;
+            border-radius: 10px;
+            box-shadow: 0 2px 8px #ccc;
+        }
+
+        table {
+            width: 100%;
+            background: white;
+            border-collapse: collapse;
+        }
+
+        th, td {
+            padding: 12px;
+            border: 1px solid #ddd;
+            text-align: center;
+        }
+
+        th {
+            background: #374151;
+            color: white;
+        }
+
+        button {
+            padding: 10px 20px;
+            background: #2563eb;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+
+    </style>
+
+</head>
+
+
+<body>
+
+<header>
+
+    <h1>Smart Urban Planning Dashboard</h1>
+
+    <p>Traffic • Pollution • Complaints</p>
+
+</header>
+
+
+<div class="container">
+
+    <div class="cards">
+
+        <div class="card">
+
+            <h3>Total Locations</h3>
+
+            <h2 id="locations">0</h2>
+
+        </div>
+
+
+        <div class="card">
+
+            <h3>Average Traffic</h3>
+
+            <h2 id="traffic">0</h2>
+
+        </div>
+
+
+        <div class="card">
+
+            <h3>Average Pollution</h3>
+
+            <h2 id="pollution">0</h2>
+
+        </div>
+
+    </div>
+
+
+    <h2>Urban Monitoring Data</h2>
+
+    <table>
+
+        <thead>
+
+            <tr>
+
+                <th>Location</th>
+                <th>Traffic Level</th>
+                <th>Pollution</th>
+                <th>Complaints</th>
+
+            </tr>
+
+        </thead>
+
+        <tbody id="urbanTable">
+
+        </tbody>
+
+    </table>
+
+</div>
+
+
+<script>
+
+fetch("/api/urban-data/")
+
+.then(response => response.json())
+
+.then(data => {
+
+    let table = document.getElementById(
+        "urbanTable"
+    );
+
+    let totalTraffic = 0;
+
+    let totalPollution = 0;
+
+    data.forEach(item => {
+
+        totalTraffic += item.traffic_level;
+
+        totalPollution += item.pollution_level;
+
+        let row = `
+
+        <tr>
+
+            <td>${item.location}</td>
+
+            <td>${item.traffic_level}</td>
+
+            <td>${item.pollution_level}</td>
+
+            <td>${item.complaints}</td>
+
+        </tr>
+
+        `;
+
+        table.innerHTML += row;
+
+    });
+
+
+    document.getElementById(
+        "locations"
+    ).innerText = data.length;
+
+
+    document.getElementById(
+        "traffic"
+    ).innerText =
+        (totalTraffic / data.length).toFixed(2);
+
+
+    document.getElementById(
+        "pollution"
+    ).innerText =
+        (totalPollution / data.length).toFixed(2);
+
+});
+
+</script>
+
+</body>
+
+</html>
+10. Create database
+Run:
+python manage.py makemigrations
+python manage.py migrate
+Then generate your random data:
+python manage.py shell
+from urban.generate_data import generate_data
+generate_data()
+exit()
+Start the application:
+python manage.py runserver
+Open:
+http://127.0.0.1:8000/
