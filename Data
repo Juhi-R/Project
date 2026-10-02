@@ -1,0 +1,43 @@
+import random
+from datetime import date, timedelta
+
+from .models import UrbanData
+
+
+def generate_data():
+
+    locations = [
+        "MP Nagar",
+        "New Market",
+        "Arera Colony",
+        "Kolar Road",
+        "BHEL",
+        "Habibganj",
+        "Lalghati",
+        "Misrod",
+        "Bairagarh",
+        "Ayodhya Bypass"
+    ]
+
+    UrbanData.objects.all().delete()
+
+    for i in range(50):
+
+        location = random.choice(locations)
+
+        traffic = random.randint(10, 100)
+
+        pollution = round(
+            random.uniform(20, 250), 2
+        )
+
+        complaints = random.randint(0, 30)
+
+        UrbanData.objects.create(
+            location=location,
+            traffic_level=traffic,
+            pollution_level=pollution,
+            complaints=complaints
+        )
+
+    print("50 random urban records created!")
